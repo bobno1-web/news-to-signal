@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기업 위험 뉴스 모니터링</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#e5e8ee; --line2:#eef1f5;
+    --ink:#1d2530; --sub:#5b6673; --dim:#8b95a3;
+    --accent:#2f6f6a; --accent-w:#e8f2f0;
+    --bad:#c23b3b; --bad-w:#fbecec; --res:#1c8a5b; --res-w:#e7f5ee;
+    --good:#2f6fb0; --good-w:#eaf1f9; --neu:#7b8492; --neu-w:#eef0f3;
+    --mag:#9a6b12; --mag-w:#f8f0dd; --acc:#4a5aa8; --acc-w:#eceff9;
+    --fold:#8a6d1f; --fold-w:#f7f1de;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.6}
+  header{background:linear-gradient(180deg,#ffffff,#fbfcfe);border-bottom:1px solid var(--line);padding:22px 20px}
+  header .wrap{max-width:940px;margin:0 auto}
+  header h1{margin:0;font-size:20px;letter-spacing:-.2px}
+  header p{margin:6px 0 0;color:var(--sub);font-size:13.5px}
+  main{max-width:940px;margin:0 auto;padding:18px 16px 90px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;
+    box-shadow:0 1px 2px rgba(20,30,50,.03)}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card .sub{color:var(--sub);font-size:12.5px;margin:0 0 12px}
+  .muted{color:var(--dim);font-size:12.5px}
+  label{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px;font-weight:600}
+  input,select{width:100%;padding:10px 11px;border-radius:9px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);font-size:14px}
+  input:focus,select:focus{outline:2px solid var(--accent-w);border-color:var(--accent)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:190px}
+  button{cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:10px 15px;border-radius:9px;font-size:13.5px;font-weight:600}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{background:#fff;color:var(--accent);border-color:var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .keystate{font-size:12px;font-weight:700}
+  .ok{color:var(--res)}.no{color:var(--dim)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .seg button{border:0;border-radius:0;background:#fff;color:var(--sub);font-weight:600}
+  .seg button.active{background:var(--accent);color:#fff}
+  .counts{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 2px}
+  .cpill{font-size:12px;color:var(--sub);background:var(--line2);border-radius:20px;padding:3px 11px}
+  .cpill b{color:var(--ink)}
+  /* 뉴스 카드 */
+  .item{border:1px solid var(--line);border-radius:12px;margin:9px 0;background:#fff;transition:box-shadow .15s}
+  .item:hover{box-shadow:0 2px 8px rgba(20,30,50,.06)}
+  .item .top{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;cursor:pointer}
+  .pos{flex:0 0 auto;width:24px;height:24px;border-radius:7px;background:var(--line2);color:var(--sub);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:2px}
+  .grow{flex:1;min-width:0}
+  .title{font-size:14.5px;font-weight:600;margin:0 0 4px;word-break:keep-all;color:var(--ink)}
+  .title a{color:var(--ink);text-decoration:none}
+  .title a:hover{color:var(--accent);text-decoration:underline}
+  .reason{font-size:13px;color:var(--sub)}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .badge{font-size:11.5px;font-weight:600;padding:2.5px 9px;border-radius:20px;border:1px solid transparent}
+  .b-bad{color:var(--bad);background:var(--bad-w)} .b-res{color:var(--res);background:var(--res-w)}
+  .b-good{color:var(--good);background:var(--good-w)} .b-neu{color:var(--neu);background:var(--neu-w)}
+  .b-mag{color:var(--mag);background:var(--mag-w)} .b-acc{color:var(--acc);background:var(--acc-w)}
+  .b-un{color:var(--fold);background:var(--fold-w)} .b-fold{color:var(--fold);background:var(--fold-w)}
+  .b-periph{color:var(--fold);background:var(--fold-w);border-color:var(--line)}  /* 타사 기사 내 언급(강등) */
+  .b-audit{color:var(--mag);background:var(--mag-w);border-color:var(--mag)}  /* 감사 확인 요망(루프11) */
+  .periph-divider{margin:14px 2px 4px;padding:7px 11px;border-top:1px dashed var(--line);
+    color:var(--dim);font-size:12px;line-height:1.5}
+  /* 사건군 묶음(루프13): 대표 1건 아래로 같은 사안의 나머지 국면을 접는다(삭제 아님, 펼침) */
+  .cluster{margin:2px 2px 10px 49px;border:1px dashed var(--fold);border-radius:10px;background:var(--fold-w)}
+  .cluster .ch{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:8px 12px;cursor:pointer;color:var(--fold);font-size:12.5px}
+  .cluster .ch b{color:var(--fold)}
+  .cluster .cbody{display:none;padding:0 8px 8px}
+  .cluster.open .cbody{display:block}
+  .caret{flex:0 0 auto;color:var(--accent);font-size:12px;margin-top:3px;white-space:nowrap;font-weight:600}
+  .layer2{display:none;padding:2px 14px 14px 49px}
+  .item.open .layer2{display:block}
+  .l2{margin:9px 0}
+  .l2 .k{display:block;font-size:11px;color:var(--dim);font-weight:700;margin-bottom:2px;letter-spacing:.2px}
+  .l2 .v{font-size:13px;color:var(--ink)}
+  .quote{border-left:3px solid var(--accent);padding:5px 11px;color:var(--ink);background:var(--accent-w);
+    border-radius:0 7px 7px 0;font-size:12.8px}
+  /* 바구니 */
+  .basket{margin:12px 0}
+  .basket .bh{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;
+    background:#fbfcfe;border:1px solid var(--line);border-radius:11px;cursor:pointer}
+  .basket .bh b{font-size:13.5px}
+  .basket.mine .bh{border-color:var(--accent);background:var(--accent-w)}
+  .basket .body{display:none;padding-top:4px}
+  .basket.open .body{display:block}
+  /* 내 계정 선택(패널 + 재무제표 표) */
+  .mycard{border:1px solid var(--line);border-radius:12px;background:#fbfcfe;margin:0 0 12px;overflow:hidden}
+  .mycard .acch{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;cursor:pointer}
+  .mycard .acch b{font-size:13.5px}
+  .mycard .accbody{display:none;padding:0 15px 14px}
+  .mycard.open .accbody{display:block}
+  .stmt{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:#fff}
+  .stmt .stmth{display:flex;justify-content:space-between;align-items:center;padding:10px 13px;cursor:pointer}
+  .stmt .stmth b{font-size:13px}
+  .stmt .stmtbody{display:none;padding:6px 13px 13px}
+  .stmt.open .stmtbody{display:block}
+  .accsel{display:flex;flex-wrap:wrap;gap:7px}
+  .accsel label{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 11px;border:1px solid var(--line);
+    border-radius:20px;background:#fff;color:var(--ink);font-size:12.5px;cursor:pointer;font-weight:500}
+  .accsel label.linked{border-color:var(--accent);background:var(--accent-w);color:var(--accent)}
+  .accsel input{width:auto;margin:0}
+  /* 접힘 줄 */
+  .foldbar{margin-top:16px;border:1px dashed var(--line);border-radius:12px;background:#fbfbfa;overflow:hidden}
+  .foldbar .fh{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;cursor:pointer}
+  .foldbar .fh b{font-size:13.5px;color:var(--fold)}
+  .foldbar .fbody{display:none;padding:2px 12px 12px}
+  .foldbar.open .fbody{display:block}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .empty{color:var(--dim);padding:12px 4px;font-size:13px}
+  .err{color:var(--bad);background:var(--bad-w);border:1px solid #f3d2d2;border-radius:9px;padding:10px 13px;margin:8px 0;font-size:13px}
+  .hide{display:none}
+  .pill{font-size:11px;color:#fff;background:var(--accent);padding:2px 9px;border-radius:20px;font-weight:700;vertical-align:2px}
+  .fineprint{font-size:11.5px;color:var(--dim);margin-top:6px}
+  /* 발행일 */
+  .meta{margin:1px 0 3px}
+  .date{font-size:11.5px;color:var(--dim);font-weight:600}
+  /* 재무상태표(BS) T계정 선택 표: 자산(좌) | 부채(우상)·자본(우하) */
+  .bstt{display:flex;gap:12px;flex-wrap:wrap}
+  .bstt .bscol{flex:1;min-width:250px;display:flex;flex-direction:column;gap:10px}
+  .bssec{border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px 11px}
+  .bssec-h{font-size:12.5px;font-weight:700;color:var(--ink);margin:0 0 7px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
+  .bsrows{display:flex;flex-wrap:wrap;gap:6px}
+  .bsleaf{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 11px;border:1px solid var(--line);
+    border-radius:20px;background:#fff;color:var(--ink);font-size:12.5px;cursor:pointer;font-weight:500}
+  .bsleaf.linked{border-color:var(--accent);background:var(--accent-w);color:var(--accent)}
+  .bsleaf input{width:auto;margin:0}
+  /* 동명 계정 구분 표기(원본 이름은 그대로, 소속 소계명을 곁들임) — 루프12 */
+  .bsctx{color:var(--dim);font-size:11px;font-weight:500}
+  .bstotal{display:inline-flex;align-items:center;padding:6px 11px;border-radius:20px;border:1px dashed var(--line);
+    background:var(--line2);color:var(--dim);font-size:12.5px;font-weight:600}
+  /* 합계=그룹 전체 선택 버튼(말단 소속이 산술로 잡힌 합계). 잠금(bstotal)과 시각적으로 구분. */
+  .bsgroup{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 11px;border-radius:20px;
+    border:1px solid var(--accent);background:#fff;color:var(--accent);font-size:12.5px;font-weight:700;
+    cursor:pointer;font-family:inherit}
+  .bsgroup:hover{background:var(--accent-w)}
+  .bsgroup.on{background:var(--accent);color:#fff}
+  .bsgroup .gcount{font-size:11px;font-weight:600;background:var(--accent-w);color:var(--accent);border-radius:10px;padding:0 6px}
+  .bsgroup.on .gcount{background:rgba(255,255,255,.22);color:#fff}
+  .bshint{font-size:11.5px;color:var(--sub);margin:0 0 9px}
+  .bsnote{font-size:11.5px;color:var(--fold);background:var(--fold-w);border-radius:8px;padding:7px 10px;margin:0 0 9px}
+  .bsunassigned{margin-top:11px}
+  .bsunassigned .bssec{border-color:var(--mag);border-style:dashed}
+  .bsunassigned .bssec-h{color:var(--mag)}
+  .bssel-head{display:flex;justify-content:space-between;align-items:center;margin:2px 0 9px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>기업 위험 뉴스 모니터링 <span id="egPill" class="pill hide">예시 결과</span></h1>
+  <p>회사명을 넣으면 외부 뉴스에서 <b>재무·감사 위험 신호</b>를 찾아 심각도순으로 정렬하고,
+     계정 담당자별로 보여줍니다. 이 도구는 위험을 판정하지 않습니다 — 판정은 감사인이 합니다.</p>
+</div></header>
+<main>
+
+  <div class="card" id="keyCard">
+    <h2>API 키 입력 <span id="keyState" class="keystate no">· 미설정</span></h2>
+    <p class="sub">키는 <b>이 서버 메모리에만</b> 저장됩니다. 파일·로그에 남지 않고 서버를 끄면 사라집니다.</p>
+    <div class="row">
+      <div><label>NAVER_CLIENT_ID <span class="muted">(네이버 뉴스 검색)</span></label><input id="k_NAVER_CLIENT_ID" type="password" autocomplete="off"></div>
+      <div><label>NAVER_CLIENT_SECRET</label><input id="k_NAVER_CLIENT_SECRET" type="password" autocomplete="off"></div>
+    </div>
+    <div class="row">
+      <div><label>ANTHROPIC_API_KEY <span class="muted">(판단)</span></label><input id="k_ANTHROPIC_API_KEY" type="password" autocomplete="off"></div>
+      <div><label>OPENDART_API_KEY <span class="muted">(계정·재무)</span></label><input id="k_OPENDART_API_KEY" type="password" autocomplete="off"></div>
+    </div>
+    <div class="toolbar">
+      <button class="primary" id="saveKeys">키 저장(메모리)</button>
+      <button class="ghost" id="egBtn">키 없이 예시 결과 보기</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>회사 분석</h2>
+    <p class="sub">기본 화면에는 <b>재무·감사 악재</b>와 <b>위험 해소</b>만 보입니다. 단순 호재·무관 뉴스는 맨 아래 접힘 줄에 보존됩니다.</p>
+    <div class="row">
+      <div style="flex:2"><label>회사명</label><input id="company" placeholder="예: 삼성전자" autocomplete="off"></div>
+    </div>
+    <p class="fineprint">수집 개수는 고르지 않습니다 — 최근 <b>약 1년치</b>를 넓게 자동 수집한 뒤, 중복을 정리하고 명백한 무관만 걸러 판단합니다.</p>
+    <div class="toolbar">
+      <button class="primary" id="analyzeBtn">분석 시작</button>
+      <span class="muted">넓게 수집·판단·재무조회로 <b>수십 초~수 분</b> 걸릴 수 있습니다.</span>
+    </div>
+    <div id="analyzeMsg"></div>
+  </div>
+
+  <div class="card hide" id="resultCard">
+    <div id="resHead"></div>
+    <div class="toolbar" style="margin-top:12px">
+      <span class="muted">보기</span>
+      <div class="seg"><button id="viewB" class="active">심각도순</button><button id="viewA">계정별 보기</button></div>
+    </div>
+
+    <div id="severityView" style="margin-top:12px"></div>
+
+    <div id="accountView" class="hide" style="margin-top:12px">
+      <div class="mycard open" id="accPanel">
+        <div class="acch" onclick="document.getElementById('accPanel').classList.toggle('open')">
+          <b>내 계정 선택 <span id="selCount" class="muted"></span></b>
+          <span class="muted">재무제표별로 담당 계정을 고르세요 · 펼치기/접기</span>
+        </div>
+        <div class="accbody">
+          <p class="sub">재무상태표(BS)에서 담당 계정을 고르세요 — <b>자산</b>(왼쪽) · <b>부채</b>(오른쪽 위) · <b>자본</b>(오른쪽 아래). 합계 계정은 선택할 수 없고 말단 계정만 고릅니다. 고른 계정에 걸린 뉴스가 ① 바구니로 모입니다. <b>판단은 바뀌지 않습니다</b> — 보여주는 묶음만 달라집니다.</p>
+          <p class="fineprint">배정은 <b>계정군(이름) 단위</b>입니다 — 유동/비유동처럼 이름이 같은 계정을 고르면 같은 이름의 뉴스가 함께 배정됩니다(더 보이는 쪽이라 안전, 정밀 확인은 카드의 계정 가설·근거로).</p>
+          <div id="stmtTables"></div>
+          <div id="bsSelectedSummary" class="hide"></div>
+          <div class="toolbar" id="applyClearBar" style="margin-top:6px">
+            <button class="primary" id="applyAcc">확인 · 선택 적용</button>
+            <button class="ghost" id="clearAcc">해제</button>
+          </div>
+        </div>
+      </div>
+      <div id="baskets"></div>
+    </div>
+
+    <div class="foldbar" id="foldbar">
+      <div class="fh" onclick="document.getElementById('foldbar').classList.toggle('open')">
+        <b id="foldTitle">표시되지 않은 뉴스</b><span class="muted">펼치기 ▾ (단순 호재·무관·기권 — 지워지지 않고 보존됨)</span>
+      </div>
+      <div class="fbody" id="foldBody"></div>
+    </div>
+  </div>
+
+</main>
+<script>
+const KEY_NAMES=["NAVER_CLIENT_ID","NAVER_CLIENT_SECRET","ANTHROPIC_API_KEY","OPENDART_API_KEY"];
+const S={company:null,data:null};
+const $=id=>document.getElementById(id);
+const esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(path,opts){const r=await fetch(path,opts);const j=await r.json();
+  if(!r.ok) throw new Error(j.message||j.error||("HTTP "+r.status)); return j;}
+
+/* 2층 펼치기/접기 — 확실히 양방향 */
+function toggleItem(topEl){
+  const item=topEl.parentNode, open=item.classList.toggle('open');
+  const c=topEl.querySelector('.caret'); if(c) c.textContent = open ? '접기 ▴' : '자세히 ▾';
+}
+function statusBadge(it){
+  if(it.unjudged) return `<span class="badge b-mag">⚠ 미판단</span>`;   // 판단 응답 누락 — 사람 확인 필요(증발 방어)
+  if(it.abstained) return `<span class="badge b-neu">판단 기권</span>`;
+  if(it.resolution) return `<span class="badge b-res">위험 해소</span>`;
+  if(it.direction==="악재") return `<span class="badge b-bad">악재</span>`;
+  if(it.direction==="호재") return `<span class="badge b-good">호재</span>`;
+  return `<span class="badge b-neu">중립</span>`;
+}
+function accBadge(it){
+  if(it.account_tags && it.account_tags.length)
+    return it.account_tags.map(a=>`<span class="badge b-acc">계정 ${esc(a)}</span>`).join("");
+  return `<span class="badge b-un">계정 미배정</span>`;
+}
+/* 주체성(루프10): 타사 기사 내 언급(C)이면 라벨 뱃지. A/B(단독·복수 주체)는 뱃지 없음(차등 없음). */
+function subjectBadge(it){
+  return it.peripheral_mention ? `<span class="badge b-periph">타사 기사 내 언급</span>` : "";
+}
+/* 감사중요(루프11): 감사인 확인·후속절차 요망이면 라벨. 방향 중립이어도 이 값으로 기본화면에 오른다. */
+function auditBadge(it){
+  return it.audit_attention ? `<span class="badge b-audit">감사 확인 요망</span>` : "";
+}
+/* 2층 다이어트: (a) 방향 근거 문장 하나(왜 악재/호재인가), (b) 계정 가설(왜 이 계정인가). */
+function layer2(it){
+  let h="";
+  /* 주체성 C: 이 기사의 주체가 누구이며 이 회사가 어떻게 언급됐는지(왜 하단인가) — 맨 위에. */
+  if(it.peripheral_mention && it.subject_note){
+    h+=`<div class="l2"><span class="k">주체성 · 타사 기사 내 언급(하단 배치 이유)</span><div class="v">${esc(it.subject_note)}</div></div>`;
+  }
+  /* 감사중요(루프11): 왜 감사인의 확인·후속절차가 필요한지(방향 중립이어도 오른 이유). */
+  if(it.audit_attention && it.audit_note){
+    h+=`<div class="l2"><span class="k">감사 확인 요망 · 후속절차가 필요한 이유</span><div class="v">${esc(it.audit_note)}</div></div>`;
+  }
+  if(it.evidence && it.evidence.length){
+    h+=`<div class="l2"><span class="k">근거 문장 · 왜 악재/호재인가</span><div class="quote">"${esc(it.evidence[0].quote)}"</div></div>`;
+  }
+  (it.account_hypotheses||[]).forEach(a=>{
+    h+=`<div class="l2"><span class="k">계정 가설 · ${esc(a.account_group)} · 왜 이 계정인가</span><div class="v">${esc(a.reason)}</div><div class="quote">근거 "${esc(a.quote)}"</div></div>`;
+  });
+  return h;
+}
+function dateHTML(it){ return `<div class="meta"><span class="date">${esc(it.published_display||"날짜 미상")}</span></div>`; }
+function rowHTML(it,pos,foldReason){
+  const title = it.link?`<a href="${esc(it.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(it.title)}</a>`:esc(it.title);
+  const foldChip = foldReason?`<span class="badge b-fold">${esc(foldReason)}</span>`:"";
+  /* 깔때기에서 판단 전에 접힌 뉴스(중복·간이무관): 판단이 없으므로 경량 렌더(제목+발행일+사유만). */
+  if(it.screened_out){
+    return `<div class="item"><div class="top" style="cursor:default">
+      <div class="pos">${pos}</div>
+      <div class="grow"><div class="title">${title}</div>${dateHTML(it)}
+        <div class="tags">${foldChip||`<span class="badge b-fold">${esc(it.fold_reason||"")}</span>`}</div></div>
+    </div></div>`;
+  }
+  /* 1층 뱃지: 상태(악재/호재/위험해소/기권/중립) + 계정만. 규모 뱃지는 카드에서 뺀다. */
+  return `<div class="item">
+    <div class="top" onclick="toggleItem(this)">
+      <div class="pos">${pos}</div>
+      <div class="grow">
+        <div class="title">${title}</div>
+        ${dateHTML(it)}
+        <div class="reason">${esc(it.one_line_reason)}</div>
+        <div class="tags">${foldChip}${statusBadge(it)}${auditBadge(it)}${subjectBadge(it)}${accBadge(it)}</div>
+      </div>
+      <div class="caret">자세히 ▾</div>
+    </div>
+    <div class="layer2">${layer2(it)}</div>
+  </div>`;
+}
+
+function renderSeverity(){
+  const v=$("severityView");
+  const arr=S.data.severity_view||[];
+  if(!arr.length){
+    v.innerHTML=`<div class="empty">기본 화면에 표시할 악재·위험 해소 뉴스가 없습니다. (아래 접힘 줄을 확인하세요.)</div>`;
+    return;
+  }
+  /* 루프10: 타사 기사 내 언급(C)은 하단으로 강등돼 있다. 그 경계에 구분선을 넣어
+     '이 아래는 이 회사를 다룬 기사가 아니라 스친 언급'임을 알린다(삭제 아님, 스크롤로 접근). */
+  const firstPeri=arr.findIndex(it=>it.peripheral_mention);
+  v.innerHTML=arr.map((it,i)=>{
+    const divider=(firstPeri>0 && i===firstPeri)
+      ? `<div class="periph-divider">↓ 이 아래는 <b>타사 기사 내 언급</b> — 이 회사를 다룬 기사가 아니라 다른 주체의 기사에 스친 언급입니다. 삭제하지 않고 하단에 둡니다(펼치면 어느 기사에 어떻게 언급됐는지 보입니다).</div>`
+      : "";
+    return divider+rowHTML(it,i+1)+clusterHTML(it);
+  }).join("");
+}
+/* 루프13: 같은 사건군(동일 사안의 연속 보도)은 대표 1건만 위에 두고, 나머지 국면(확정·재판·소송
+   등)은 그 대표 아래로 접는다. 삭제가 아니라 접힘 — 펼치면 전부 보인다(원칙 7). 병합이 아니라
+   '묶어 보이기'라, 각 국면의 판단(방향·심각도·근거)은 개별로 그대로 남는다. */
+function clusterHTML(it){
+  const mem=it.cluster_members;
+  if(!mem||!mem.length) return "";
+  const total=it.cluster_count||(mem.length+1);
+  const body=mem.map((m,i)=>rowHTML(m,i+1)).join("");
+  return `<div class="cluster">
+    <div class="ch" onclick="this.parentNode.classList.toggle('open')">
+      <span><b>사건군: ${esc(it.cluster_label||"")}</b> <span class="muted">· 이 사안 ${total}건 중 대표 1건만 위에 표시</span></span>
+      <span class="muted">나머지 ${mem.length}건 펼치기 ▾ (삭제 아님 · 각 국면 개별 보존)</span>
+    </div>
+    <div class="cbody">${body}</div>
+  </div>`;
+}
+function renderBaskets(baskets){
+  $("baskets").innerHTML=baskets.map(b=>{
+    const open=b.key==="mine";
+    const body=b.items.length? b.items.map((it,i)=>rowHTML(it,i+1)).join("") : `<div class="empty">없음.</div>`;
+    return `<div class="basket ${b.key} ${open?'open':''}">
+      <div class="bh" onclick="this.parentNode.classList.toggle('open')"><b>${esc(b.label)}</b><span class="muted">${b.count}건 · 펼치기/접기</span></div>
+      <div class="body">${body}</div></div>`;
+  }).join("");
+}
+function renderFolded(){
+  const f=S.data.folded_view||[];
+  $("foldTitle").textContent=`표시되지 않은 뉴스 ${f.length}건`;
+  $("foldBody").innerHTML = f.length
+    ? f.map((it,i)=>rowHTML(it,i+1,it.fold_reason)).join("")
+    : `<div class="empty">접힌 뉴스 없음(모두 표시됨).</div>`;
+}
+/* 계정 선택 = 재무상태표(BS) T계정 표. 자산(좌) · 부채(우상) · 자본(우하), 계정 '이름'만(금액 없음).
+   합계 계정은 선택 불가(구조로 탐지), 말단만 체크박스. bs_table 이 없는 옛 예시는 구분별 표로 폴백. */
+function renderBsSelection(){
+  $("stmtTables").classList.remove("hide");
+  $("applyClearBar").classList.remove("hide");
+  $("bsSelectedSummary").classList.add("hide");
+  const bt=S.data.bs_table;
+  if(!bt){ renderStatementTablesFallback(); updateSel(); return; }
+  const linked=new Set(S.data.linked_accounts||[]);
+  // 안정 키(행 위치)로 선택·그룹·토글을 건다(표시명 아님) — 동명 계정이 서로 섞이지 않게(루프12).
+  // 옛 예시(키 없음)는 이름으로 폴백한다(그 데이터엔 동명 충돌이 없어 안전).
+  const keyOf=a=>(a.key!=null?String(a.key):a.name);
+  // 동명 계정 구분 표기: 원본 이름은 그대로 두고 소속 소계명(DART 원본)만 곁들인다.
+  const ctxHtml=a=>a.context?` <span class="bsctx">· ${esc(a.context)}</span>`:"";
+  // 합계 계정: 소속 말단(member_keys)이 산술로 잡히면 '그룹 전체 선택' 버튼, 아니면 잠금(기존).
+  const cell=a=>{
+    if(a.selectable){
+      const k=keyOf(a);
+      return `<label class="bsleaf ${linked.has(a.name)?'linked':''}"><input type="checkbox" value="${esc(k)}" data-name="${esc(a.name)}"${a.context?` data-context="${esc(a.context)}"`:""} onchange="updateSel()">${esc(a.name)}${ctxHtml(a)}${linked.has(a.name)?' ·뉴스':''}</label>`;
+    }
+    const mkeys=a.member_keys||a.members;   // 새 결과=안정 키, 옛 예시=이름(폴백)
+    if(mkeys&&mkeys.length)
+      return `<button type="button" class="bsgroup" data-members="${esc(JSON.stringify(mkeys))}" onclick="toggleGroup(this)" title="${esc(a.name)} 그룹의 말단 계정 ${mkeys.length}개를 한 번에 선택/해제">${esc(a.name)}${ctxHtml(a)} · 그룹 <span class="gcount">${mkeys.length}</span></button>`;
+    return `<span class="bstotal">${esc(a.name)}${ctxHtml(a)} · 합계</span>`;
+  };
+  const sec=(title,arr)=>{const sel=(arr||[]).filter(x=>x.selectable).length;
+    return `<div class="bssec"><div class="bssec-h">${title} <span class="muted">· 선택 가능 ${sel}개</span></div>
+      <div class="bsrows">${(arr&&arr.length)?arr.map(cell).join(""):'<span class="muted">계정 없음</span>'}</div></div>`;};
+  const hasGroup=[bt.assets,bt.liabilities,bt.equity].some(arr=>(arr||[]).some(x=>!x.selectable&&(x.member_keys||x.members)&&(x.member_keys||x.members).length));
+  const hint=hasGroup?`<div class="bshint">합계(초록 · 그룹)를 누르면 그 그룹의 말단 계정이 한 번에 선택됩니다. 다시 누르면 해제 — 결과는 말단을 하나씩 고른 것과 같습니다.</div>`:``;
+  const unassigned=bt.unassigned||[];
+  // 구조(금액·IFRS 앵커)로 섹션을 확정 못한 계정: 인접 섹션에 밀어넣지 않고 '구분 미확정'으로 분리(원칙 4·7).
+  const note=(bt.fallback_used||unassigned.length)?`<div class="bsnote">일부 계정은 구조(금액·IFRS 앵커)로 자산/부채/자본을 확정하지 못했습니다. 인접 섹션에 밀어넣지 않고 아래 <b>구분 미확정</b>으로 분리했습니다 — 감사인 확인이 필요합니다.</div>`:``;
+  const unassignedSec=unassigned.length?`<div class="bsunassigned">${sec("구분 미확정 (확인 요망)", unassigned)}</div>`:``;
+  $("stmtTables").innerHTML = note + hint + `<div class="bstt">
+    <div class="bscol">${sec("자산 (Assets)", bt.assets)}</div>
+    <div class="bscol">${sec("부채 (Liabilities)", bt.liabilities)}${sec("자본 (Equity)", bt.equity)}</div>
+  </div>` + unassignedSec;
+  updateSel();
+}
+/* 합계 클릭 = 그 그룹의 말단 계정 전부 토글. 이미 전부 선택돼 있으면 해제, 아니면 전부 선택.
+   '선택'은 여전히 말단 체크박스로만 이뤄진다 — 합계 자체는 담당 계정이 아니라 담기지 않는다.
+   라우팅·판단 로직은 불변(개별 선택과 결과 동일). 표시·선택 편의일 뿐이다. */
+function toggleGroup(btn){
+  // 그룹 members 는 '안정 키'(행 위치)다 — 표시명이 아니라 키로 체크박스를 찾으므로, 동명 계정
+  // (유동/비유동 계약부채 등)이 있어도 그 그룹의 '정확한' 말단만 켠다(2차 피해 해소, 루프12).
+  let members; try{members=JSON.parse(btn.getAttribute("data-members"))||[];}catch(e){members=[];}
+  const set=new Set(members.map(String));
+  const boxes=[...document.querySelectorAll('#stmtTables input[type=checkbox]')].filter(x=>set.has(x.value));
+  const allOn=boxes.length>0 && boxes.every(x=>x.checked);
+  boxes.forEach(x=>{x.checked=!allOn;});
+  updateSel();
+}
+/* 그룹 버튼의 on 표시: 그 그룹 말단(안정 키)이 '전부' 선택돼 있으면 켬(개별 선택 변화도 반영). */
+function refreshGroupStates(){
+  const checked=new Set(selectedKeys());
+  document.querySelectorAll('#stmtTables .bsgroup').forEach(btn=>{
+    let members; try{members=JSON.parse(btn.getAttribute("data-members"))||[];}catch(e){members=[];}
+    btn.classList.toggle("on", members.length>0 && members.map(String).every(m=>checked.has(m)));
+  });
+}
+/* 폴백: bs_table 이 없는 옛 예시 결과는 예전처럼 재무제표 구분별 표로 보여준다(숨기지 않음). */
+function renderStatementTablesFallback(){
+  const stmts=S.data.account_statements||[];
+  const linked=new Set(S.data.linked_accounts||[]);
+  if(!stmts.length){$("stmtTables").innerHTML=`<div class="empty">계정 후보가 없습니다.</div>`;return;}
+  $("stmtTables").innerHTML=stmts.map(s=>{
+    const chips=s.accounts.map(a=>`<label class="${linked.has(a)?'linked':''}"><input type="checkbox" value="${esc(a)}" data-name="${esc(a)}" onchange="updateSel()">${esc(a)}${linked.has(a)?' ·뉴스':''}</label>`).join("");
+    return `<div class="stmt">
+      <div class="stmth" onclick="this.parentNode.classList.toggle('open')"><b>${esc(s.sj_nm)}</b><span class="muted">${s.accounts.length}개 계정 · 펼치기/접기</span></div>
+      <div class="stmtbody accsel">${chips||'<span class="muted">계정 없음</span>'}</div></div>`;
+  }).join("");
+}
+/* 선택 상태·그룹 토글은 '안정 키'(체크박스 value = 행 위치)로 다룬다. */
+function selectedKeys(){return [...document.querySelectorAll('#stmtTables input:checked')].map(x=>x.value);}
+/* 라우팅은 계정군(이름) 수준이다(account-linkage.md: 정밀 매칭은 사람 몫). 선택된 말단의 표시명을
+   중복 없이 보낸다 — 동명 계정을 골라도 판단·라우팅은 그 이름의 계정군으로 (느슨히) 매칭된다. */
+function selectedRouteNames(){
+  const names=[...document.querySelectorAll('#stmtTables input:checked')].map(x=>x.dataset.name||x.value);
+  return [...new Set(names)];
+}
+/* 선택된 말단의 표시정보(이름+구분표기) — 접힌 요약(collapseBsSelection)에서 동명 계정을 구분해 보이게. */
+function selectedDisplay(){
+  return [...document.querySelectorAll('#stmtTables input:checked')]
+    .map(x=>({name:x.dataset.name||x.value, context:x.dataset.context||""}));
+}
+function updateSel(){const n=selectedKeys().length;$("selCount").textContent=n?`— ${n}개 선택됨`:"";refreshGroupStates();}
+/* 선택 적용 후: T계정 표를 접고 '선택된 계정'만 요약. '다시 선택'으로 표를 되살린다(숨기지 않음). */
+function collapseBsSelection(sel){
+  // sel: [{name, context}] — 동명 계정은 구분표기(context)를 곁들여 무엇을 골랐는지 드러낸다.
+  const chips = sel.length? sel.map(a=>`<span class="badge b-acc">${esc(a.name)}${a.context?` · ${esc(a.context)}`:""}</span>`).join("")
+    : `<span class="muted">선택된 계정 없음 — 판단은 그대로이며, 배정된 뉴스는 ③으로 모입니다.</span>`;
+  $("bsSelectedSummary").innerHTML =
+    `<div class="bssel-head"><b>선택된 계정 ${sel.length}개</b><button class="ghost" id="editBs">다시 선택</button></div>
+     <div class="tags">${chips}</div>`;
+  $("bsSelectedSummary").classList.remove("hide");
+  $("stmtTables").classList.add("hide");
+  $("applyClearBar").classList.add("hide");
+  $("editBs").onclick=()=>{
+    $("bsSelectedSummary").classList.add("hide");
+    $("stmtTables").classList.remove("hide");
+    $("applyClearBar").classList.remove("hide");
+  };
+}
+
+function showResult(data,example){
+  S.data=data;S.company=data.company;
+  $("egPill").classList.toggle("hide",!example);
+  const c=data.counts, f=data.funnel;
+  const funnelLine = f ? `<div class="fineprint">깔때기: 수집 <b>${f.collected}</b> → 중복정리 후 <b>${f.after_dedup}</b> → 정밀판단 <b>${f.judged}</b> <span class="muted">(중복 ${f.dup_folded} · 간이무관 ${f.irrelevant_folded} 접힘)</span>${f.unjudged?` · <span style="color:var(--mag)">⚠ 미판단 ${f.unjudged}건(판단 응답 누락 — 사람 확인)</span>`:``}${f.hit_ceiling?` · <span style="color:var(--mag)">네이버 1000건 상한 도달</span>`:``}</div>` : ``;
+  $("resHead").innerHTML=`<div style="font-size:16px;font-weight:700">${esc(data.company)}</div>
+    <div class="counts"><span class="cpill">수집 <b>${c.collected}</b></span>
+      <span class="cpill">표시 <b>${c.shown}</b></span>
+      <span class="cpill">접힘 <b>${c.folded}</b></span></div>
+    ${funnelLine}
+    <div class="muted">${esc(data.financials_text)}</div>
+    <div class="fineprint">순위는 내부 점수 없이 '위치'로만 표기합니다. 접힌 뉴스도 삭제되지 않고 맨 아래에서 펼쳐 볼 수 있습니다.</div>`;
+  $("resultCard").classList.remove("hide");
+  $("accPanel").classList.add("open");
+  renderSeverity();renderBaskets(data.baskets);renderBsSelection();renderFolded();
+  setView("B");
+  $("resultCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function setView(w){
+  $("viewB").classList.toggle("active",w==="B");$("viewA").classList.toggle("active",w==="A");
+  $("severityView").classList.toggle("hide",w!=="B");$("accountView").classList.toggle("hide",w!=="A");
+}
+async function refreshState(){const st=await api("/api/state");
+  $("keyState").textContent=st.all_keys_set?"· 모두 설정됨":"· 미설정";
+  $("keyState").className="keystate "+(st.all_keys_set?"ok":"no");}
+
+$("saveKeys").onclick=async()=>{const body={};KEY_NAMES.forEach(n=>body[n]=$("k_"+n).value);
+  try{const r=await api("/api/keys",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    KEY_NAMES.forEach(n=>$("k_"+n).value="");
+    $("keyState").textContent=r.all_keys_set?"· 모두 설정됨":"· 미설정";
+    $("keyState").className="keystate "+(r.all_keys_set?"ok":"no");
+  }catch(e){alert("키 저장 실패: "+e.message);}};
+$("analyzeBtn").onclick=async()=>{const company=$("company").value.trim();
+  if(!company){$("analyzeMsg").innerHTML=`<div class="err">회사명을 입력하세요.</div>`;return;}
+  $("analyzeBtn").disabled=true;
+  $("analyzeMsg").innerHTML=`<div class="muted" style="margin-top:8px"><span class="spin"></span> 수집·판단 중… 창을 닫지 마세요.</div>`;
+  try{const data=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({company})});
+    $("analyzeMsg").innerHTML="";showResult(data,false);
+  }catch(e){$("analyzeMsg").innerHTML=`<div class="err">분석 중단: ${esc(e.message)}</div>`;}
+  finally{$("analyzeBtn").disabled=false;}};
+$("egBtn").onclick=async()=>{try{showResult(await api("/api/example"),true);}catch(e){alert("예시 불러오기 실패: "+e.message);}};
+$("viewB").onclick=()=>setView("B");$("viewA").onclick=()=>setView("A");
+$("clearAcc").onclick=()=>{document.querySelectorAll('#stmtTables input:checked').forEach(x=>x.checked=false);updateSel();};
+$("applyAcc").onclick=async()=>{try{const sel=selectedRouteNames();   // 라우팅엔 이름(계정군) 전달
+    const disp=selectedDisplay();                                     // 요약 표시엔 이름+구분표기
+    const r=await api("/api/route",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({company:S.company,selected:sel})});
+    renderBaskets(r.baskets);
+    collapseBsSelection(disp);                 // T계정 표를 접고 '선택된 계정'만 요약(3단계)
+    $("baskets").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){alert("라우팅 실패: "+e.message);}};
+refreshState();
+</script>
+</body>
+</html>
